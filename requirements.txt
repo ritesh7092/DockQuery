@@ -10,3 +10,5 @@ sentence-transformers
 google-generativeai
 langchain-community
 python-dotenv
+opencv-python-headless
+numpy

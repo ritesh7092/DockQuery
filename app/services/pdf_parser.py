@@ -6,6 +6,8 @@ from typing import List, Dict, Any, Optional
 from dataclasses import dataclass, asdict
 from PIL import Image
 import numpy as np
+from app.utils.visual_classifier import VisualClassifier
+from app.config import settings
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -42,6 +44,7 @@ class PDFParser:
         """
         self.output_dir = output_dir
         os.makedirs(self.output_dir, exist_ok=True)
+        self.classifier = VisualClassifier()
 
     def parse_pdf(self, file_path: str) -> Dict[str, Any]:
         """
@@ -164,7 +167,8 @@ class PDFParser:
                     vocab_bbox = list(rects[0])
 
                 # Classify
-                img_type = self.classify_visual_element(image)
+                classification = self.classifier.classify(image)
+                img_type = classification["type"]
 
                 # Attempt to find caption (text below image)
                 caption = None
@@ -189,57 +193,18 @@ class PDFParser:
 
     def classify_visual_element(self, image: Image.Image) -> str:
         """
-        Classifies an image as 'chart', 'table', or 'diagram' based on heuristics.
+        [Deprecated] Uses internal classifier now.
+        Kept for backward internal compatibility if needed, but delegating.
         """
-        # Convert to grayscale for analysis
-        gray_image = image.convert("L")
-        np_image = np.array(gray_image)
-        
-        # Heuristic 1: Tables often have many horizontal and vertical lines (grids)
-        # We can detect this by looking for peaks in row/col intensity gradients or just pixel distribution
-        # A simple proxy: high frequency of straight lines. 
-        # For simplicity, we'll check if it looks "grid-like" but this is hard on raw pixels without OpenCV.
-        # Let's rely on primitive stats.
-        
-        # Heuristic: Tables - sparse, mostly white provided it's a document scan, but extracted images might be just the graphics.
-        # Actually, `find_tables` handles real tables. Images that are tables are usually screenshots.
-        
-        # Heuristic: Charts often have axes.
-        # We can look for solid lines at the left and bottom edges?
-        
-        width, height = image.size
-        # Basic heuristic: Aspect ratio and complexity
-        # Diagrams: High variance, non-grid structure
-        # Charts: distinct colors, often plenty of white space if line chart, or solid blocks if bar.
-        
-        # Let's use a very simplified approach for now as we don't have heavy CV libs (like cv2) guaranteed, 
-        # though we have numpy.
-        
-        # Edge detection or variance could help.
-        # Tables: High structure.
-        # Charts: Axes.
-        
-        # If we can't reliably determine without CV2, we default to 'image' or based on aspect ratio?
-        # The user requested specific heuristics:
-        # - Tables: High ratio of horizontal/vertical lines
-        # - Charts: Presence of axes, legends, data points
-        # - Diagrams: Complex shapes, annotations
-        
-        # Since I cannot use OpenCV (cv2) unless I add it to requirements (which I didn't see),
-        # I will use a placeholder logic or simple PIL logic.
-        
-        # Placeholder for robust classification
-        # In a real expanded version, I'd use a small CNN or layout model.
-        # Here, I'll attempt to guess based on pixel density.
-        
-        unique_colors = len(image.getcolors(maxcolors=100000) or [])
-        
-        # Charts often have limited palettes (bars, lines)
-        # Photos have high color counts.
-        
-        if unique_colors < 50:
-            # Low color count -> likely chart or diagram
-            # Check for grid-ish pattern?
-             return "chart"
-        
-        return "image" # Default fallback
+        return self.classifier.classify(image)["type"]
+
+
+def parse_pdf(file_path: str, filename: str = None) -> Dict[str, Any]:
+    """
+    Top-level helper to support the API interface.
+    """
+    # If filename is provided, it might be used for naming images, 
+    # but PDFParser currently uses basename of file_path. 
+    # We can stick to defaults for now or update PDFParser to accept a prefix.
+    parser = PDFParser(output_dir=os.path.join(settings.EXTRACTED_DIR if hasattr(settings, 'EXTRACTED_DIR') else "data/extracted_images"))
+    return parser.parse_pdf(file_path)
