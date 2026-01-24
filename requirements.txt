@@ -12,3 +12,5 @@ langchain-community
 python-dotenv
 opencv-python-headless
 numpy
+pytest
+pytest-asyncio
