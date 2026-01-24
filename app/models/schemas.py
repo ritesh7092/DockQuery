@@ -4,16 +4,54 @@ from dataclasses import dataclass
 import numpy as np
 
 class UploadResponse(BaseModel):
+    """Response for successful file upload."""
+    pdf_id: str
     filename: str
+    status: str  # "processing", "queued"
     message: str
-    pages_processed: int
+
+class UploadStatusResponse(BaseModel):
+    """Response for upload status query."""
+    pdf_id: str
+    status: str  # "processing", "completed", "failed"
+    progress: float  # 0.0 to 1.0
+    result: Optional['ProcessingResult'] = None
+    error: Optional[str] = None
 
 class QueryRequest(BaseModel):
+    """Enhanced query request with filtering and streaming options."""
     query: str
+    pdf_id: Optional[str] = None  # Filter by specific PDF
+    top_k: int = 5  # Number of results to retrieve
+    include_images: bool = True  # Include visual elements
+    stream: bool = False  # Stream response with SSE
+
+class VisualElement(BaseModel):
+    """Visual element reference in query response."""
+    type: str  # "image", "table", "chart"
+    page: int
+    image_id: str  # Unique identifier for image retrieval
+    pdf_id: str  # PDF this image belongs to
+    url: str  # Endpoint to retrieve the image
+    description: str  # Brief description of the visual
+
+# RAG Pipeline Models (moved here to be available for QueryResponse)
+class SourceReference(BaseModel):
+    """Source reference with attribution details."""
+    type: str  # "text", "image", "table", "chart"
+    page: int
+    content_preview: str
+    image_path: Optional[str] = None
+    confidence: float
 
 class QueryResponse(BaseModel):
-    answer: str
-    sources: List[Any]
+    """Enhanced query response with visual elements and timing."""
+    query: str
+    summary: str
+    sources: List[SourceReference]
+    visual_elements: List[VisualElement] = []
+    processing_time_ms: float
+    cached: bool = False
 
 # Vector Store Models
 @dataclass
@@ -32,15 +70,6 @@ class Document:
     content: str  # Text content or image description
     metadata: DocumentMetadata
     embedding: Optional[np.ndarray] = None
-
-# RAG Pipeline Models
-class SourceReference(BaseModel):
-    """Source reference with attribution details."""
-    type: str  # "text", "image", "table", "chart"
-    page: int
-    content_preview: str
-    image_path: Optional[str] = None
-    confidence: float
 
 class ProcessingResult(BaseModel):
     """Result from PDF processing pipeline."""

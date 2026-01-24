@@ -22,6 +22,20 @@ class Settings(BaseSettings):
     CACHE_MAX_SIZE: int = 100
     RERANK_TOP_K: int = 20
     MIN_CONFIDENCE_THRESHOLD: float = 0.3
+    
+    # Upload Configuration
+    MAX_UPLOAD_SIZE: int = 50 * 1024 * 1024  # 50MB in bytes
+    ALLOWED_MIME_TYPES: list = ["application/pdf"]
+    PDF_MAGIC_BYTES: bytes = b"%PDF-"
+    
+    # Rate Limiting
+    RATE_LIMIT_UPLOADS: int = 10  # uploads per window
+    RATE_LIMIT_WINDOW: int = 3600  # 1 hour in seconds
+    RATE_LIMIT_QUERIES: int = 100  # queries per window
+    
+    # Query Configuration
+    MAX_QUERY_LENGTH: int = 1000  # Maximum query string length
+    QUERY_CACHE_TTL: int = 1800  # 30 minutes
 
     class Config:
         env_file = ".env"

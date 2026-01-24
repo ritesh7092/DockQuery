@@ -14,3 +14,5 @@ opencv-python-headless
 numpy
 pytest
 pytest-asyncio
+requests
+sse-starlette
