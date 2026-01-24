@@ -10,6 +10,18 @@ class Settings(BaseSettings):
     CLIP_MODEL: str = "clip-ViT-B-32"
     DEVICE: str = "cuda" if os.environ.get("CUDA_VISIBLE_DEVICES") else "cpu"
     EMBEDDING_BATCH_SIZE: int = 32
+    
+    # Gemini Agent Configuration
+    GEMINI_MODEL: str = "gemini-1.5-flash"
+    MAX_RETRIES: int = 3
+    INITIAL_RETRY_DELAY: float = 1.0
+    REQUEST_TIMEOUT: int = 30
+    
+    # RAG Pipeline Configuration
+    CACHE_TTL_SECONDS: int = 3600
+    CACHE_MAX_SIZE: int = 100
+    RERANK_TOP_K: int = 20
+    MIN_CONFIDENCE_THRESHOLD: float = 0.3
 
     class Config:
         env_file = ".env"
