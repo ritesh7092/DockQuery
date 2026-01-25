@@ -487,6 +487,17 @@ class RAGPipeline:
         Returns:
             Tuple of (text_context_list, visual_paths_list)
         """
+        # Log aggregation details
+        logger.info(f"Aggregating context: {len(text_results)} text results, {len(visual_results)} visual results")
+        
+        if text_results:
+            logger.debug(f"Text result pages: {[doc.metadata.page for doc in text_results]}")
+        else:
+            logger.warning("No text results found for aggregation")
+            
+        if visual_results:
+            logger.debug(f"Visual result types: {[(doc.metadata.type, doc.metadata.page) for doc in visual_results]}")
+        
         # Prepare text context with page attribution
         text_context = []
         for doc in text_results:
@@ -499,6 +510,7 @@ class RAGPipeline:
             if doc.metadata.image_path:
                 visual_paths.append(Path(doc.metadata.image_path))
         
+        logger.info(f"Context aggregation complete: {len(text_context)} text chunks, {len(visual_paths)} visual paths")
         return text_context, visual_paths
     
     def _create_source_references(

@@ -80,25 +80,30 @@ class GeminiAgent:
             Complete summary string or iterator of text chunks if streaming
         """
         try:
-            # Build the prompt
-            prompt = self._build_prompt(query, text_context)
-            
             # Encode images if provided
             images = []
+            has_visuals = False
             if visual_context and len(visual_context) > 0:
                 try:
                     images = self._encode_images(visual_context)
+                    has_visuals = len(images) > 0
+                    logger.info(f"Successfully encoded {len(images)} visual elements")
                 except Exception as e:
                     logger.warning(f"Image encoding failed, falling back to text-only: {e}")
                     # Continue with text-only if image encoding fails
+            
+            # Build the prompt with visual context info
+            prompt = self._build_prompt(query, text_context, has_visuals=has_visuals)
             
             # Prepare content for generation
             if images:
                 # Multimodal: interleave prompt and images
                 content = [prompt] + images
+                logger.debug("Generating multimodal response")
             else:
                 # Text-only
                 content = prompt
+                logger.debug("Generating text-only response")
             
             # Generate with retry logic
             if stream:
@@ -148,7 +153,8 @@ class GeminiAgent:
     def _build_prompt(
         self,
         query: str,
-        text_context: List[str]
+        text_context: List[str],
+        has_visuals: bool = False
     ) -> str:
         """
         Build a sophisticated prompt for accurate summarization.
@@ -156,6 +162,7 @@ class GeminiAgent:
         Args:
             query: User's query
             text_context: List of text chunks
+            has_visuals: Whether visual elements (images/charts/tables) are provided
             
         Returns:
             Formatted prompt string
@@ -163,8 +170,31 @@ class GeminiAgent:
         # Extract page references from context
         page_refs = self._extract_page_references(text_context)
         
-        # Combine text context
-        combined_context = "\n\n".join(text_context) if text_context else "No text context available."
+        # Combine text context - properly handle empty list vs None
+        if text_context and len(text_context) > 0:
+            combined_context = "\n\n".join(text_context)
+        else:
+            combined_context = "No text context available."
+        
+        # Build visual elements section conditionally
+        visual_section = ""
+        if has_visuals:
+            visual_section = """
+Visual Elements:
+The visual elements (charts, tables, diagrams) are provided alongside this text. Please analyze them in context.
+"""
+        
+        # Build task instructions based on available data
+        task_instructions = ["1. Directly answers the query"]
+        
+        if has_visuals:
+            task_instructions.append("2. References specific data from tables/charts when relevant")
+            task_instructions.append(f"3. Maintains accuracy and cites page numbers when available{f' (available pages: {', '.join(map(str, page_refs))})' if page_refs else ''}")
+            task_instructions.append("4. Explains visual elements in context")
+            task_instructions.append("5. Synthesizes information from both text and visual sources")
+        else:
+            task_instructions.append(f"2. Maintains accuracy and cites page numbers when available{f' (available pages: {', '.join(map(str, page_refs))})' if page_refs else ''}")
+            task_instructions.append("3. Provides a clear and comprehensive response based on the text context")
         
         # Build structured prompt
         prompt = f"""You are an expert analyst. Based on the following context extracted from a PDF document, provide a comprehensive summary addressing the user's query.
@@ -172,17 +202,10 @@ class GeminiAgent:
 Query: {query}
 
 Text Context:
-{combined_context}
-
-Visual Elements:
-The visual elements (charts, tables, diagrams) are provided alongside this text. Please analyze them in context.
+{combined_context}{visual_section}
 
 Provide a detailed summary that:
-1. Directly answers the query
-2. References specific data from tables/charts when relevant
-3. Maintains accuracy and cites page numbers when available{f' (available pages: {", ".join(map(str, page_refs))})' if page_refs else ''}
-4. Explains visual elements in context
-5. Synthesizes information from both text and visual sources
+{chr(10).join(task_instructions)}
 
 Summary:"""
         
@@ -321,6 +344,10 @@ Summary:"""
             List of unique page numbers found in context
         """
         page_numbers = set()
+        
+        # Handle None or empty list
+        if not text_context:
+            return []
         
         for text in text_context:
             # Look for common page reference patterns
