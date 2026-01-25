@@ -105,9 +105,19 @@ class VectorStore:
                 if doc.metadata.image_path:
                     metadata["image_path"] = doc.metadata.image_path
                 if doc.metadata.bbox:
-                    # Convert bbox dict to strings for ChromaDB compatibility
-                    for k, v in doc.metadata.bbox.items():
-                        metadata[f"bbox_{k}"] = float(v)
+                    # Convert bbox to ChromaDB-compatible format
+                    # Handle both dict and list/tuple formats
+                    if isinstance(doc.metadata.bbox, dict):
+                        for k, v in doc.metadata.bbox.items():
+                            metadata[f"bbox_{k}"] = float(v)
+                    elif isinstance(doc.metadata.bbox, (list, tuple)) and len(doc.metadata.bbox) == 4:
+                        # Convert [x0, y0, x1, y1] to dict format
+                        metadata["bbox_x0"] = float(doc.metadata.bbox[0])
+                        metadata["bbox_y0"] = float(doc.metadata.bbox[1])
+                        metadata["bbox_x1"] = float(doc.metadata.bbox[2])
+                        metadata["bbox_y1"] = float(doc.metadata.bbox[3])
+                    else:
+                        logger.warning(f"Unexpected bbox format for document {doc.id}: {type(doc.metadata.bbox)}")
                 metadatas.append(metadata)
             
             # Convert embeddings to list format

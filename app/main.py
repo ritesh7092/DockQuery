@@ -20,6 +20,7 @@ from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
+from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.config import settings
@@ -326,13 +327,8 @@ async def system_metrics() -> Dict[str, Any]:
     }
 
 
-@app.get("/", tags=["root"])
-async def root():
-    """Root endpoint with API information."""
-    return {
-        "message": "Multimodal RAG API",
-        "version": "1.0.0",
-        "docs": "/api/docs",
-        "health": "/health",
-        "metrics": "/api/v1/metrics"
-    }
+# Mount static files for frontend (must be last to avoid route conflicts)
+static_dir = os.path.join(os.path.dirname(__file__), "static")
+if os.path.exists(static_dir):
+    app.mount("/", StaticFiles(directory=static_dir, html=True), name="static")
+    logger.info(f"✓ Static files mounted from: {static_dir}")

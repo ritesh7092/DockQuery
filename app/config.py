@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     EMBEDDING_BATCH_SIZE: int = 32
     
     # Gemini Agent Configuration
-    GEMINI_MODEL: str = "gemini-1.5-flash"
+    GEMINI_MODEL: str = "gemini-2.5-flash"  # Stable version, supports 1M tokens
     MAX_RETRIES: int = 3
     INITIAL_RETRY_DELAY: float = 1.0
     REQUEST_TIMEOUT: int = 30
