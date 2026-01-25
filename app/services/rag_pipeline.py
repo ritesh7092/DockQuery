@@ -129,6 +129,7 @@ class RAGPipeline:
             
             # Step 2: Generate embeddings
             logger.info("Step 2/3: Generating embeddings...")
+            logger.info(f"DEBUG: Processing {len(text_blocks)} text blocks, {len(images)} images, {len(tables)} tables")
             documents = []
             embeddings = []
             
@@ -139,6 +140,7 @@ class RAGPipeline:
                 )
                 documents.extend(text_docs)
                 embeddings.extend(text_embeddings)
+                logger.info(f"DEBUG: After text processing: {len(text_docs)} docs, {len(text_embeddings)} embeddings")
                 
                 # Process visual elements
                 visual_docs, visual_embeddings = self._process_visual_elements(
@@ -146,8 +148,10 @@ class RAGPipeline:
                 )
                 documents.extend(visual_docs)
                 embeddings.extend(visual_embeddings)
+                logger.info(f"DEBUG: After visual processing: {len(visual_docs)} visual docs, {len(visual_embeddings)} visual embeddings")
                 
-                logger.info(f"Generated {len(embeddings)} embeddings")
+                logger.info(f"Generated {len(embeddings)} total embeddings")
+                logger.info(f"DEBUG: Total documents to store: {len(documents)}")
                 
             except Exception as e:
                 logger.error(f"Embedding generation failed: {e}")
@@ -155,19 +159,37 @@ class RAGPipeline:
             
             # Step 3: Store in vector database
             logger.info("Step 3/3: Storing in vector database...")
+            logger.info(f"DEBUG: About to store - documents: {len(documents)}, embeddings: {len(embeddings)}")
             try:
                 if documents and embeddings:
+                    logger.info(f"DEBUG: Initializing collection '{collection_name}'...")
                     self.vector_store.initialize_collection(
                         collection_name=collection_name,
                         reset=False
                     )
+                    logger.info(f"DEBUG: Calling add_documents with {len(documents)} documents...")
                     self.vector_store.add_documents(
                         docs=documents,
                         embeddings=embeddings,
                         collection_name=collection_name
                     )
-                    logger.info(f"Stored {len(documents)} documents in vector store")
+                    logger.info(f"✓ Successfully stored {len(documents)} documents in vector store")
+                    
+                    # VERIFY documents were actually added
+                    logger.info(f"DEBUG: Verifying documents were stored...")
+                    collection = self.vector_store.collections.get(collection_name)
+                    if collection:
+                        total_count = collection.count()
+                        logger.info(f"DEBUG: Vector store now has {total_count} total documents")
+                        # Check if our docs are there
+                        test_results = collection.get(where={"source": pdf_id}, limit=1)
+                        if test_results and test_results['ids']:
+                            logger.info(f"✓ VERIFICATION PASSED: Found documents for PDF {pdf_id}")
+                        else:
+                            logger.error(f"✗ VERIFICATION FAILED: NO documents found for PDF {pdf_id} after storage!")
+                            errors.append(f"Documents added but not found in verification for PDF {pdf_id}")
                 else:
+                    logger.error(f"DEBUG: Cannot store - documents: {len(documents)}, embeddings: {len(embeddings)}")
                     errors.append("No documents to store")
                     
             except Exception as e:
@@ -399,16 +421,21 @@ class RAGPipeline:
                 continue
             
             try:
-                # Generate image embedding
-                img_embedding = self.embedding_service.embed_image(img_path)
-                
                 # Create document with image description
                 content = f"{img['type']} on page {img['page']}"
                 if img.get("caption_context"):
                     content += f": {img['caption_context']}"
                 
+                # BUG FIX: Use text embedding for visual elements to match vector dimension (384)
+                # Raw CLIP image embeddings (512) cannot be mixed with MiniLM text embeddings (384)
+                # unless we align them. For text-to-text RAG, embedding the description is better.
+                img_embedding = self.embedding_service.embed_text(content)
+                if isinstance(img_embedding, list):
+                    img_embedding = img_embedding[0]
+                
                 doc = Document(
-                    id=f"{pdf_id}_{img['type']}_{i}",
+                    # Use 'viz' prefix to avoid collision with struct tables
+                    id=f"{pdf_id}_viz_{img['type']}_{i}",
                     content=content,
                     metadata=DocumentMetadata(
                         type=img["type"],
@@ -438,7 +465,8 @@ class RAGPipeline:
                     table_embedding = table_embedding[0]
                 
                 doc = Document(
-                    id=f"{pdf_id}_table_{i}",
+                    # Use 'struct_table' to verify from visual tables
+                    id=f"{pdf_id}_struct_table_{i}",
                     content=content,
                     metadata=DocumentMetadata(
                         type="table",
