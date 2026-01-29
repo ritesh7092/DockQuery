@@ -196,6 +196,9 @@ The visual elements (charts, tables, diagrams) are provided alongside this text.
             task_instructions.append(f"2. Maintains accuracy and cites page numbers when available{f' (available pages: {', '.join(map(str, page_refs))})' if page_refs else ''}")
             task_instructions.append("3. Provides a clear and comprehensive response based on the text context")
         
+        # Add formatting instructions
+        task_instructions.append("6. FORMATTING: Use Markdown. **Bold** key entities and metrics. Use bullet points for lists. Use headers for sections.")
+        
         # Build structured prompt
         prompt = f"""You are an expert analyst. Based on the following context extracted from a PDF document, provide a comprehensive summary addressing the user's query.
 
